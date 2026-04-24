@@ -1,5 +1,7 @@
 # InspectAI
 
+Stop spending your evenings writing reports.
+
 AI-assisted home inspection report generator. Inspector onboarding, checklist, and streaming report output — ported from the single-file prototype into Next.js (App Router).
 
 ## Setup
