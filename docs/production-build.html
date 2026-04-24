@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InspectAI — Production Build Walkthrough</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #181410;
+  --paper: #f6f2eb;
+  --cream: #ede7d8;
+  --rule: #dbd3c3;
+  --orange: #c4510a;
+  --accent: #1b4d72;
+  --muted: #8a7f72;
+  --green: #246030;
+  --red: #a82020;
+  --white: #fff;
+  --code-bg: #1a1714;
+  --code-fg: #e8e0d0;
+}
+body {
+  font-family: 'IBM Plex Mono', monospace;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* NAV */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--ink);
+  border-bottom: 2px solid var(--orange);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; height: 54px;
+}
+.nav-logo { font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; color: var(--paper); }
+.nav-logo em { color: var(--orange); font-style: normal; }
+.nav-tabs { display: flex; gap: 3px; overflow-x: auto; }
+.tab {
+  background: none; border: none;
+  color: rgba(255,255,255,0.35);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; letter-spacing: 0.05em;
+  padding: 6px 14px; border-radius: 4px; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.tab:hover { color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.05); }
+.tab.active { background: var(--orange); color: white; }
+
+/* PAGES */
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* LAYOUT */
+.wrap { max-width: 860px; margin: 0 auto; padding: 48px 40px 80px; }
+
+/* HERO BAND */
+.hero-band {
+  background: var(--ink); padding: 44px 40px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.hero-inner { max-width: 860px; margin: 0 auto; }
+.hero-eyebrow {
+  font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.hero-eyebrow::before { content: ''; display: block; width: 20px; height: 1.5px; background: var(--orange); }
+.hero-title {
+  font-family: 'Fraunces', serif; font-weight: 900;
+  font-size: clamp(28px, 3.5vw, 44px);
+  letter-spacing: -1.5px; line-height: 1.05; color: var(--paper); margin-bottom: 12px;
+}
+.hero-title em { font-style: italic; color: var(--orange); }
+.hero-sub { font-size: 13px; color: rgba(246,242,235,0.4); max-width: 560px; line-height: 1.8; }
+
+/* STACK BAR */
+.stack-bar {
+  background: var(--cream); border-bottom: 1px solid var(--rule);
+  padding: 14px 40px;
+}
+.stack-inner {
+  max-width: 860px; margin: 0 auto;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.stack-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-right: 8px; }
+.stack-chip {
+  font-size: 11px; padding: 4px 12px; border-radius: 4px;
+  border: 1px solid var(--rule); background: var(--white); color: var(--ink);
+  display: flex; align-items: center; gap: 5px;
+}
+.stack-chip.highlight { background: var(--orange); color: white; border-color: var(--orange); }
+.chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+/* TYPOGRAPHY */
+.section-eyebrow {
+  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-eyebrow::before { content: ''; display: block; width: 16px; height: 1.5px; background: var(--orange); }
+h2 {
+  font-family: 'Fraunces', serif; font-weight: 900;
+  font-size: 28px; letter-spacing: -1px; margin-bottom: 8px;
+}
+h2 em { font-style: italic; color: var(--orange); }
+.section-sub { font-size: 13px; color: var(--muted); max-width: 560px; line-height: 1.8; margin-bottom: 32px; }
+
+/* CODE BLOCKS */
+.code-block {
+  background: var(--code-bg); border-radius: 8px;
+  overflow: hidden; margin: 16px 0; position: relative;
+}
+.code-header {
+  background: #141210; padding: 9px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.code-filename { font-size: 11px; color: rgba(255,255,255,0.35); letter-spacing: 0.04em; }
+.code-lang { font-size: 10px; padding: 2px 8px; border-radius: 3px; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.3); }
+.code-copy {
+  background: none; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 10px;
+  border-radius: 3px; cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em;
+}
+.code-copy:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.7); }
+.code-copy.copied { border-color: var(--green); color: #7fd49a; }
+pre {
+  padding: 18px 20px; overflow-x: auto;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; line-height: 1.8; color: var(--code-fg);
+}
+pre .c { color: #5a5248; font-style: italic; } /* comment */
+pre .k { color: #c4510a; } /* keyword / orange */
+pre .s { color: #7fb87a; } /* string / green */
+pre .v { color: #7abfdb; } /* variable / blue */
+pre .f { color: #d4a020; } /* function / yellow */
+pre .p { color: #aaa; } /* punctuation */
+
+/* STEPS */
+.step-block {
+  display: flex; gap: 16px; margin-bottom: 24px;
+  padding-bottom: 24px; border-bottom: 1px solid var(--rule);
+}
+.step-block:last-of-type { border-bottom: none; }
+.step-num-wrap {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  background: var(--ink); color: var(--paper);
+  border-radius: 6px; display: flex; align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', serif; font-weight: 900; font-size: 15px;
+  margin-top: 1px;
+}
+.step-content { flex: 1; }
+.step-title { font-weight: 500; font-size: 14px; margin-bottom: 6px; }
+.step-desc { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 10px; }
+
+/* INFO CARDS */
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+.info-card {
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 16px 18px;
+}
+.info-card-title { font-weight: 500; font-size: 12px; margin-bottom: 8px; color: var(--ink); }
+.info-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.info-list li { font-size: 11px; color: var(--muted); padding-left: 14px; position: relative; }
+.info-list li::before { content: '→'; position: absolute; left: 0; color: var(--orange); }
+.info-list li strong { color: var(--ink); }
+
+/* CALLOUT BLOCKS */
+.callout {
+  border-radius: 0 8px 8px 0; padding: 12px 16px;
+  margin: 14px 0; font-size: 12px; line-height: 1.6;
+}
+.callout.tip { background: rgba(27,77,114,0.07); border-left: 3px solid var(--accent); color: var(--muted); }
+.callout.warn { background: rgba(196,81,10,0.07); border-left: 3px solid var(--orange); color: var(--muted); }
+.callout.good { background: rgba(36,96,48,0.07); border-left: 3px solid var(--green); color: var(--muted); }
+.callout strong { color: var(--ink); }
+
+/* ENV TABLE */
+.env-table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12px; }
+.env-table th { background: var(--cream); padding: 8px 12px; text-align: left; border: 1px solid var(--rule); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.env-table td { padding: 9px 12px; border: 1px solid var(--rule); vertical-align: top; }
+.env-table td:first-child { font-family: 'IBM Plex Mono', monospace; color: var(--orange); background: #fdfaf5; }
+.env-table td:last-child { color: var(--muted); }
+
+/* FILE TREE */
+.file-tree {
+  background: var(--code-bg); border-radius: 8px;
+  padding: 18px 20px; font-size: 12px; line-height: 1.9;
+  color: var(--code-fg); margin: 14px 0; font-family: 'IBM Plex Mono', monospace;
+}
+.ft-dir { color: #7abfdb; }
+.ft-file { color: var(--code-fg); }
+.ft-comment { color: #5a5248; font-style: italic; }
+.ft-important { color: #c4510a; }
+
+/* SCHEMA */
+.schema-block {
+  background: var(--code-bg); border-radius: 8px;
+  padding: 18px 20px; margin: 14px 0; font-size: 12px; line-height: 1.9;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.sb-table { margin-bottom: 18px; }
+.sb-table-name { color: #d4a020; font-weight: 500; margin-bottom: 6px; }
+.sb-col { display: flex; gap: 16px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.sb-col:last-child { border-bottom: none; }
+.sb-col-name { color: #7abfdb; min-width: 160px; }
+.sb-col-type { color: #7fb87a; min-width: 100px; }
+.sb-col-note { color: #5a5248; font-size: 11px; font-style: italic; }
+
+/* CHECKLIST */
+.deploy-checklist { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.deploy-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 10px 14px; font-size: 12px; color: var(--muted);
+}
+.deploy-item::before { content: '□'; color: var(--rule); flex-shrink: 0; font-size: 14px; margin-top: -1px; }
+.deploy-item strong { color: var(--ink); }
+
+/* FLOW DIAGRAM */
+.flow {
+  display: flex; align-items: center; gap: 0;
+  margin: 20px 0; overflow-x: auto; padding: 4px 0;
+}
+.flow-node {
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 12px 16px; text-align: center;
+  min-width: 100px; flex-shrink: 0;
+}
+.flow-node-label { font-size: 11px; font-weight: 500; color: var(--ink); }
+.flow-node-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.flow-node.active { background: var(--orange); border-color: var(--orange); }
+.flow-node.active .flow-node-label { color: white; }
+.flow-node.active .flow-node-sub { color: rgba(255,255,255,0.6); }
+.flow-arrow { color: var(--rule); font-size: 18px; padding: 0 6px; flex-shrink: 0; }
+
+@media (max-width: 680px) {
+  nav { padding: 0 16px; }
+  .hero-band, .stack-bar { padding-left: 20px; padding-right: 20px; }
+  .wrap { padding: 32px 20px 60px; }
+  .info-grid { grid-template-columns: 1fr; }
+  .nav-tabs .tab { font-size: 10px; padding: 5px 10px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Inspect<em>AI</em></div>
+  <div class="nav-tabs">
+    <button class="tab active" onclick="show('setup',this)">1. Setup</button>
+    <button class="tab" onclick="show('auth',this)">2. Auth</button>
+    <button class="tab" onclick="show('database',this)">3. Database</button>
+    <button class="tab" onclick="show('stripe',this)">4. Stripe</button>
+    <button class="tab" onclick="show('api',this)">5. AI Route</button>
+    <button class="tab" onclick="show('deploy',this)">6. Deploy</button>
+  </div>
+</nav>
+
+<div class="hero-band">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Production Build Walkthrough</div>
+    <h1 class="hero-title">From prototype to<br><em>live product.</em></h1>
+    <p class="hero-sub">Six steps. Real code. Everything you need to go from the React component we built to a fully deployed, auth-gated, payment-enabled web app that serves itself.</p>
+  </div>
+</div>
+
+<div class="stack-bar">
+  <div class="stack-inner">
+    <div class="stack-label">Stack</div>
+    <div class="stack-chip highlight">Next.js 14</div>
+    <div class="stack-chip"><div class="chip-dot"></div>Clerk</div>
+    <div class="stack-chip"><div class="chip-dot"></div>Supabase</div>
+    <div class="stack-chip"><div class="chip-dot"></div>Stripe</div>
+    <div class="stack-chip"><div class="chip-dot"></div>Claude API</div>
+    <div class="stack-chip"><div class="chip-dot"></div>Vercel</div>
+  </div>
+</div>
+
+
+<!-- ══════════ 1. SETUP ══════════ -->
+<div id="setup" class="page active">
+<div class="wrap">
+  <div class="section-eyebrow">Step 1</div>
+  <h2>Project <em>Setup</em></h2>
+  <p class="section-sub">Scaffold the Next.js app, install every dependency you'll need, and set up the folder structure so everything has a home from day one.</p>
+
+  <div class="step-block">
+    <div class="step-num-wrap">1</div>
+    <div class="step-content">
+      <div class="step-title">Scaffold the Next.js app</div>
+      <div class="step-desc">Run this in your terminal. Choose App Router when prompted — all the code in this guide uses it.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">terminal</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre>npx create-next-app@latest inspectai \
+  --typescript \
+  --tailwind \
+  --eslint \
+  --app \
+  --src-dir \
+  --import-alias <span class="s">"@/*"</span>
+
+<span class="c"># Then move into the project</span>
+cd inspectai</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">2</div>
+    <div class="step-content">
+      <div class="step-title">Install all dependencies in one go</div>
+      <div class="step-desc">Get everything you'll need upfront so you're not hunting for packages mid-build.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">terminal</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="c"># Auth</span>
+npm install @clerk/nextjs
+
+<span class="c"># Database</span>
+npm install @supabase/supabase-js
+
+<span class="c"># Payments</span>
+npm install stripe @stripe/stripe-js
+
+<span class="c"># AI</span>
+npm install @anthropic-ai/sdk
+
+<span class="c"># Utilities</span>
+npm install clsx lucide-react</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">3</div>
+    <div class="step-content">
+      <div class="step-title">Your final folder structure</div>
+      <div class="step-desc">This is what the project should look like. Create these folders and files as you work through each step.</div>
+      <div class="file-tree">
+<span class="ft-dir">inspectai/</span>
+├── <span class="ft-dir">src/</span>
+│   ├── <span class="ft-dir">app/</span>
+│   │   ├── <span class="ft-important">layout.tsx</span>          <span class="ft-comment"># Root layout — Clerk provider lives here</span>
+│   │   ├── <span class="ft-file">page.tsx</span>            <span class="ft-comment"># Landing page (public)</span>
+│   │   ├── <span class="ft-dir">sign-in/</span>
+│   │   │   └── <span class="ft-file">[[...sign-in]]/page.tsx</span>
+│   │   ├── <span class="ft-dir">sign-up/</span>
+│   │   │   └── <span class="ft-file">[[...sign-up]]/page.tsx</span>
+│   │   ├── <span class="ft-dir">dashboard/</span>
+│   │   │   └── <span class="ft-important">page.tsx</span>        <span class="ft-comment"># Main app (protected)</span>
+│   │   ├── <span class="ft-dir">onboarding/</span>
+│   │   │   └── <span class="ft-file">page.tsx</span>
+│   │   └── <span class="ft-dir">api/</span>
+│   │       ├── <span class="ft-important">generate-report/</span>
+│   │       │   └── <span class="ft-important">route.ts</span>    <span class="ft-comment"># Claude API call — server only</span>
+│   │       ├── <span class="ft-dir">stripe/</span>
+│   │       │   ├── <span class="ft-important">checkout/route.ts</span>
+│   │       │   └── <span class="ft-important">webhook/route.ts</span>
+│   │       └── <span class="ft-dir">user/</span>
+│   │           └── <span class="ft-file">profile/route.ts</span>
+│   ├── <span class="ft-dir">components/</span>
+│   │   ├── <span class="ft-file">Checklist.tsx</span>
+│   │   ├── <span class="ft-file">ReportOutput.tsx</span>
+│   │   ├── <span class="ft-file">Onboarding.tsx</span>
+│   │   └── <span class="ft-file">PricingModal.tsx</span>
+│   ├── <span class="ft-dir">lib/</span>
+│   │   ├── <span class="ft-file">supabase.ts</span>         <span class="ft-comment"># Supabase client</span>
+│   │   ├── <span class="ft-file">stripe.ts</span>           <span class="ft-comment"># Stripe client</span>
+│   │   └── <span class="ft-file">prompts.ts</span>          <span class="ft-comment"># System prompts</span>
+│   └── <span class="ft-important">middleware.ts</span>           <span class="ft-comment"># Clerk auth — protects /dashboard</span>
+├── <span class="ft-important">.env.local</span>                 <span class="ft-comment"># All secrets live here — never commit</span>
+└── <span class="ft-file">package.json</span></div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">4</div>
+    <div class="step-content">
+      <div class="step-title">Set up your .env.local with all keys</div>
+      <div class="step-desc">Create this file at the project root. You'll fill in real values as you complete each step. Never commit this file to Git — it's already in .gitignore.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">.env.local</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">env</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="c"># Clerk — from clerk.com dashboard</span>
+<span class="v">NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</span>=pk_test_...
+<span class="v">CLERK_SECRET_KEY</span>=sk_test_...
+<span class="v">NEXT_PUBLIC_CLERK_SIGN_IN_URL</span>=/sign-in
+<span class="v">NEXT_PUBLIC_CLERK_SIGN_UP_URL</span>=/sign-up
+<span class="v">NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL</span>=/dashboard
+<span class="v">NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL</span>=/onboarding
+
+<span class="c"># Supabase — from supabase.com dashboard</span>
+<span class="v">NEXT_PUBLIC_SUPABASE_URL</span>=https://xxx.supabase.co
+<span class="v">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>=eyJ...
+<span class="v">SUPABASE_SERVICE_ROLE_KEY</span>=eyJ...
+
+<span class="c"># Stripe — from stripe.com dashboard</span>
+<span class="v">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</span>=pk_test_...
+<span class="v">STRIPE_SECRET_KEY</span>=sk_test_...
+<span class="v">STRIPE_WEBHOOK_SECRET</span>=whsec_...
+<span class="v">STRIPE_PRICE_ID_TRIAL</span>=price_...   <span class="c"># $1 for 7 days → $99/mo</span>
+<span class="v">STRIPE_PRICE_ID_PRO</span>=price_...     <span class="c"># $99/mo straight</span>
+
+<span class="c"># Anthropic — from console.anthropic.com</span>
+<span class="v">ANTHROPIC_API_KEY</span>=sk-ant-...
+
+<span class="c"># App</span>
+<span class="v">NEXT_PUBLIC_APP_URL</span>=http://localhost:3000</pre>
+      </div>
+      <div class="callout warn"><strong>Security rule:</strong> Any key prefixed <code>NEXT_PUBLIC_</code> is exposed to the browser. Your Anthropic API key, Stripe secret key, and Supabase service role key must NEVER have that prefix — they are server-only.</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+
+<!-- ══════════ 2. AUTH ══════════ -->
+<div id="auth" class="page">
+<div class="wrap">
+  <div class="section-eyebrow">Step 2</div>
+  <h2>Auth with <em>Clerk</em></h2>
+  <p class="section-sub">Clerk handles everything: sign up, sign in, sessions, user management. Three files and you have working auth across the entire app.</p>
+
+  <div class="callout tip"><strong>Why Clerk over NextAuth?</strong> Clerk gives you a hosted UI, user management dashboard, and webhook support out of the box. For a solo founder shipping fast, it saves days of work. Free up to 10,000 monthly active users.</div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">1</div>
+    <div class="step-content">
+      <div class="step-title">Wrap the app in ClerkProvider</div>
+      <div class="step-desc">This goes in your root layout. Every page inside it has access to auth state.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/layout.tsx</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">tsx</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { ClerkProvider } <span class="k">from</span> <span class="s">'@clerk/nextjs'</span>
+<span class="k">import</span> <span class="s">'./globals.css'</span>
+
+<span class="k">export default function</span> <span class="f">RootLayout</span>({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  <span class="k">return</span> (
+    <span class="p">&lt;</span><span class="v">ClerkProvider</span><span class="p">&gt;</span>
+      <span class="p">&lt;</span><span class="v">html</span> lang=<span class="s">"en"</span><span class="p">&gt;</span>
+        <span class="p">&lt;</span><span class="v">body</span><span class="p">&gt;</span>{children}<span class="p">&lt;/</span><span class="v">body</span><span class="p">&gt;</span>
+      <span class="p">&lt;/</span><span class="v">html</span><span class="p">&gt;</span>
+    <span class="p">&lt;/</span><span class="v">ClerkProvider</span><span class="p">&gt;</span>
+  )
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">2</div>
+    <div class="step-content">
+      <div class="step-title">Add middleware to protect /dashboard</div>
+      <div class="step-desc">This single file makes every route under /dashboard require a logged-in user. Anyone who hits /dashboard without auth gets redirected to /sign-in automatically.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/middleware.ts</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">ts</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { clerkMiddleware, createRouteMatcher } <span class="k">from</span> <span class="s">'@clerk/nextjs/server'</span>
+
+<span class="k">const</span> <span class="v">isProtectedRoute</span> = <span class="f">createRouteMatcher</span>([
+  <span class="s">'/dashboard(.*)'</span>,
+  <span class="s">'/onboarding(.*)'</span>,
+  <span class="s">'/api/generate-report(.*)'</span>,
+  <span class="s">'/api/user(.*)'</span>,
+])
+
+<span class="k">export default</span> <span class="f">clerkMiddleware</span>((auth, req) => {
+  <span class="k">if</span> (<span class="f">isProtectedRoute</span>(req)) {
+    auth().<span class="f">protect</span>()
+  }
+})
+
+<span class="k">export const</span> config = {
+  matcher: [<span class="s">'/((?!.*\\..*|_next).*)'</span>, <span class="s">'/'</span>, <span class="s">'/(api|trpc)(.*)'</span>],
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">3</div>
+    <div class="step-content">
+      <div class="step-title">Add hosted sign-in and sign-up pages</div>
+      <div class="step-desc">Clerk provides a pre-built UI component. These two files are literally all you need for complete auth screens.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/sign-in/[[...sign-in]]/page.tsx</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">tsx</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { SignIn } <span class="k">from</span> <span class="s">'@clerk/nextjs'</span>
+
+<span class="k">export default function</span> <span class="f">SignInPage</span>() {
+  <span class="k">return</span> (
+    <span class="p">&lt;</span><span class="v">div</span> style={{ display: <span class="s">'flex'</span>, justifyContent: <span class="s">'center'</span>, paddingTop: <span class="s">'80px'</span> }}<span class="p">&gt;</span>
+      <span class="p">&lt;</span><span class="v">SignIn</span> <span class="p">/&gt;</span>
+    <span class="p">&lt;/</span><span class="v">div</span><span class="p">&gt;</span>
+  )
+}</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/sign-up/[[...sign-up]]/page.tsx</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">tsx</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { SignUp } <span class="k">from</span> <span class="s">'@clerk/nextjs'</span>
+
+<span class="k">export default function</span> <span class="f">SignUpPage</span>() {
+  <span class="k">return</span> (
+    <span class="p">&lt;</span><span class="v">div</span> style={{ display: <span class="s">'flex'</span>, justifyContent: <span class="s">'center'</span>, paddingTop: <span class="s">'80px'</span> }}<span class="p">&gt;</span>
+      <span class="p">&lt;</span><span class="v">SignUp</span> <span class="p">/&gt;</span>
+    <span class="p">&lt;/</span><span class="v">div</span><span class="p">&gt;</span>
+  )
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">4</div>
+    <div class="step-content">
+      <div class="step-title">Get the current user in any server component</div>
+      <div class="step-desc">Use this pattern in your dashboard and API routes to get the logged-in user's ID. This ID links to their Supabase profile.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/dashboard/page.tsx (server component)</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">tsx</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { auth, currentUser } <span class="k">from</span> <span class="s">'@clerk/nextjs/server'</span>
+<span class="k">import</span> { redirect } <span class="k">from</span> <span class="s">'next/navigation'</span>
+
+<span class="k">export default async function</span> <span class="f">DashboardPage</span>() {
+  <span class="k">const</span> { userId } = <span class="f">auth</span>()
+  <span class="k">if</span> (!userId) <span class="f">redirect</span>(<span class="s">'/sign-in'</span>)
+
+  <span class="k">const</span> user = <span class="k">await</span> <span class="f">currentUser</span>()
+
+  <span class="k">return</span> (
+    <span class="p">&lt;</span><span class="v">div</span><span class="p">&gt;</span>
+      <span class="p">&lt;</span><span class="v">h1</span><span class="p">&gt;</span>Welcome, {user?.firstName}<span class="p">&lt;/</span><span class="v">h1</span><span class="p">&gt;</span>
+      <span class="c">{/* Your dashboard app goes here */}</span>
+    <span class="p">&lt;/</span><span class="v">div</span><span class="p">&gt;</span>
+  )
+}</pre>
+      </div>
+      <div class="callout good"><strong>The userId is your foreign key.</strong> Every Supabase record you create for this user stores their Clerk userId. That's how you link auth to data throughout the app.</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+
+<!-- ══════════ 3. DATABASE ══════════ -->
+<div id="database" class="page">
+<div class="wrap">
+  <div class="section-eyebrow">Step 3</div>
+  <h2>Database with <em>Supabase</em></h2>
+  <p class="section-sub">Supabase is a hosted Postgres database with a generous free tier. You need three tables: users (profile + subscription status), reports (saved reports), and inspector_profiles (onboarding data).</p>
+
+  <div class="step-block">
+    <div class="step-num-wrap">1</div>
+    <div class="step-content">
+      <div class="step-title">Create the database schema</div>
+      <div class="step-desc">Go to your Supabase project → SQL Editor → run this. Creates all three tables with the right relationships.</div>
+      <div class="schema-block">
+        <div class="sb-table">
+          <div class="sb-table-name">users</div>
+          <div class="sb-col"><span class="sb-col-name">id</span><span class="sb-col-type">uuid</span><span class="sb-col-note">primary key, auto-generated</span></div>
+          <div class="sb-col"><span class="sb-col-name">clerk_user_id</span><span class="sb-col-type">text</span><span class="sb-col-note">unique — links Clerk auth to this row</span></div>
+          <div class="sb-col"><span class="sb-col-name">email</span><span class="sb-col-type">text</span><span class="sb-col-note">unique</span></div>
+          <div class="sb-col"><span class="sb-col-name">stripe_customer_id</span><span class="sb-col-type">text</span><span class="sb-col-note">set when Stripe customer is created</span></div>
+          <div class="sb-col"><span class="sb-col-name">subscription_status</span><span class="sb-col-type">text</span><span class="sb-col-note">trialing | active | past_due | canceled</span></div>
+          <div class="sb-col"><span class="sb-col-name">plan</span><span class="sb-col-type">text</span><span class="sb-col-note">starter | professional | team</span></div>
+          <div class="sb-col"><span class="sb-col-name">reports_used_this_month</span><span class="sb-col-type">int</span><span class="sb-col-note">resets on billing cycle</span></div>
+          <div class="sb-col"><span class="sb-col-name">created_at</span><span class="sb-col-type">timestamptz</span><span class="sb-col-note">auto</span></div>
+        </div>
+        <div class="sb-table">
+          <div class="sb-table-name">inspector_profiles</div>
+          <div class="sb-col"><span class="sb-col-name">id</span><span class="sb-col-type">uuid</span><span class="sb-col-note">primary key</span></div>
+          <div class="sb-col"><span class="sb-col-name">clerk_user_id</span><span class="sb-col-type">text</span><span class="sb-col-note">foreign key → users.clerk_user_id</span></div>
+          <div class="sb-col"><span class="sb-col-name">name</span><span class="sb-col-type">text</span><span class="sb-col-note"></span></div>
+          <div class="sb-col"><span class="sb-col-name">company</span><span class="sb-col-type">text</span><span class="sb-col-note"></span></div>
+          <div class="sb-col"><span class="sb-col-name">license_number</span><span class="sb-col-type">text</span><span class="sb-col-note"></span></div>
+          <div class="sb-col"><span class="sb-col-name">state</span><span class="sb-col-type">text</span><span class="sb-col-note"></span></div>
+          <div class="sb-col"><span class="sb-col-name">report_style</span><span class="sb-col-type">text</span><span class="sb-col-note">detailed | concise | technical</span></div>
+          <div class="sb-col"><span class="sb-col-name">onboarding_complete</span><span class="sb-col-type">boolean</span><span class="sb-col-note">false until step 3 submitted</span></div>
+        </div>
+        <div class="sb-table">
+          <div class="sb-table-name">reports</div>
+          <div class="sb-col"><span class="sb-col-name">id</span><span class="sb-col-type">uuid</span><span class="sb-col-note">primary key</span></div>
+          <div class="sb-col"><span class="sb-col-name">clerk_user_id</span><span class="sb-col-type">text</span><span class="sb-col-note">foreign key</span></div>
+          <div class="sb-col"><span class="sb-col-name">address</span><span class="sb-col-type">text</span><span class="sb-col-note"></span></div>
+          <div class="sb-col"><span class="sb-col-name">client_name</span><span class="sb-col-type">text</span><span class="sb-col-note"></span></div>
+          <div class="sb-col"><span class="sb-col-name">inspection_date</span><span class="sb-col-type">date</span><span class="sb-col-note"></span></div>
+          <div class="sb-col"><span class="sb-col-name">checklist_data</span><span class="sb-col-type">jsonb</span><span class="sb-col-note">all statuses and comments as JSON</span></div>
+          <div class="sb-col"><span class="sb-col-name">generated_report</span><span class="sb-col-type">text</span><span class="sb-col-note">the full AI-generated text</span></div>
+          <div class="sb-col"><span class="sb-col-name">created_at</span><span class="sb-col-type">timestamptz</span><span class="sb-col-note">auto</span></div>
+        </div>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">Supabase SQL Editor — run this to create all tables</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">sql</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">create table</span> users (
+  id uuid <span class="k">default</span> gen_random_uuid() <span class="k">primary key</span>,
+  clerk_user_id text <span class="k">unique not null</span>,
+  email text <span class="k">unique</span>,
+  stripe_customer_id text,
+  subscription_status text <span class="k">default</span> <span class="s">'inactive'</span>,
+  plan text <span class="k">default</span> <span class="s">'free'</span>,
+  reports_used_this_month int <span class="k">default</span> 0,
+  created_at timestamptz <span class="k">default</span> now()
+);
+
+<span class="k">create table</span> inspector_profiles (
+  id uuid <span class="k">default</span> gen_random_uuid() <span class="k">primary key</span>,
+  clerk_user_id text <span class="k">references</span> users(clerk_user_id) <span class="k">on delete cascade</span>,
+  name text,
+  company text,
+  license_number text,
+  state text,
+  report_style text <span class="k">default</span> <span class="s">'detailed'</span>,
+  onboarding_complete boolean <span class="k">default</span> false
+);
+
+<span class="k">create table</span> reports (
+  id uuid <span class="k">default</span> gen_random_uuid() <span class="k">primary key</span>,
+  clerk_user_id text <span class="k">references</span> users(clerk_user_id) <span class="k">on delete cascade</span>,
+  address text,
+  client_name text,
+  inspection_date date,
+  checklist_data jsonb,
+  generated_report text,
+  created_at timestamptz <span class="k">default</span> now()
+);</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">2</div>
+    <div class="step-content">
+      <div class="step-title">Create the Supabase client</div>
+      <div class="step-desc">One file that exports a client — import it wherever you need database access.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/lib/supabase.ts</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">ts</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { createClient } <span class="k">from</span> <span class="s">'@supabase/supabase-js'</span>
+
+<span class="c">// Browser client — uses anon key (safe to expose)</span>
+<span class="k">export const</span> supabase = <span class="f">createClient</span>(
+  process.env.<span class="v">NEXT_PUBLIC_SUPABASE_URL</span>!,
+  process.env.<span class="v">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>!
+)
+
+<span class="c">// Server-only admin client — uses service role key</span>
+<span class="c">// Only import this in API routes and server components</span>
+<span class="k">export const</span> supabaseAdmin = <span class="f">createClient</span>(
+  process.env.<span class="v">NEXT_PUBLIC_SUPABASE_URL</span>!,
+  process.env.<span class="v">SUPABASE_SERVICE_ROLE_KEY</span>!
+)</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">3</div>
+    <div class="step-content">
+      <div class="step-title">Create a user record on first sign-up</div>
+      <div class="step-desc">Use a Clerk webhook to automatically create a Supabase user record when someone signs up. Set this up in your Clerk dashboard → Webhooks → add endpoint pointing to /api/clerk-webhook.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/api/clerk-webhook/route.ts</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">ts</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { Webhook } <span class="k">from</span> <span class="s">'svix'</span>
+<span class="k">import</span> { headers } <span class="k">from</span> <span class="s">'next/headers'</span>
+<span class="k">import</span> { supabaseAdmin } <span class="k">from</span> <span class="s">'@/lib/supabase'</span>
+
+<span class="k">export async function</span> <span class="f">POST</span>(req: Request) {
+  <span class="k">const</span> payload = <span class="k">await</span> req.<span class="f">json</span>()
+  <span class="k">const</span> { type, data } = payload
+
+  <span class="k">if</span> (type === <span class="s">'user.created'</span>) {
+    <span class="k">await</span> supabaseAdmin
+      .<span class="f">from</span>(<span class="s">'users'</span>)
+      .<span class="f">insert</span>({
+        clerk_user_id: data.id,
+        email: data.email_addresses[0]?.email_address,
+      })
+
+    <span class="k">await</span> supabaseAdmin
+      .<span class="f">from</span>(<span class="s">'inspector_profiles'</span>)
+      .<span class="f">insert</span>({ clerk_user_id: data.id })
+  }
+
+  <span class="k">return</span> Response.<span class="f">json</span>({ success: <span class="k">true</span> })
+}</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+
+<!-- ══════════ 4. STRIPE ══════════ -->
+<div id="stripe" class="page">
+<div class="wrap">
+  <div class="section-eyebrow">Step 4</div>
+  <h2>Payments with <em>Stripe</em></h2>
+  <p class="section-sub">Two API routes: one to create a checkout session, one to handle webhook events when payment succeeds. That's all you need to take money and unlock access.</p>
+
+  <div class="flow">
+    <div class="flow-node"><div class="flow-node-label">User clicks</div><div class="flow-node-sub">"Start trial"</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node active"><div class="flow-node-label">/api/stripe</div><div class="flow-node-sub">/checkout</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="flow-node-label">Stripe</div><div class="flow-node-sub">Hosted checkout</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node active"><div class="flow-node-label">/api/stripe</div><div class="flow-node-sub">/webhook</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="flow-node-label">Supabase</div><div class="flow-node-sub">status = active</div></div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">1</div>
+    <div class="step-content">
+      <div class="step-title">Create the Stripe client and your products</div>
+      <div class="step-desc">First, create your products in the Stripe dashboard. Then set up the server-side client.</div>
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="info-card-title">Create in Stripe Dashboard → Products</div>
+          <ul class="info-list">
+            <li><strong>Professional Trial:</strong> $1 for 7 days, then $99/mo recurring</li>
+            <li><strong>Professional:</strong> $99/mo recurring (no trial)</li>
+            <li><strong>Starter:</strong> $49/mo recurring</li>
+            <li>Copy each Price ID into your .env.local</li>
+          </ul>
+        </div>
+        <div class="info-card">
+          <div class="info-card-title">Stripe client file</div>
+          <ul class="info-list">
+            <li>Server-only — never import in client components</li>
+            <li>Uses STRIPE_SECRET_KEY from env</li>
+            <li>Single import throughout API routes</li>
+          </ul>
+        </div>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/lib/stripe.ts</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">ts</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> Stripe <span class="k">from</span> <span class="s">'stripe'</span>
+
+<span class="k">export const</span> stripe = <span class="k">new</span> <span class="f">Stripe</span>(process.env.<span class="v">STRIPE_SECRET_KEY</span>!, {
+  apiVersion: <span class="s">'2024-04-10'</span>,
+})</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">2</div>
+    <div class="step-content">
+      <div class="step-title">Checkout route — creates the Stripe session</div>
+      <div class="step-desc">When the user clicks "Start free trial", your frontend calls this route. It creates a Stripe Checkout session and returns the URL to redirect to.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/api/stripe/checkout/route.ts</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">ts</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { auth } <span class="k">from</span> <span class="s">'@clerk/nextjs/server'</span>
+<span class="k">import</span> { stripe } <span class="k">from</span> <span class="s">'@/lib/stripe'</span>
+<span class="k">import</span> { supabaseAdmin } <span class="k">from</span> <span class="s">'@/lib/supabase'</span>
+
+<span class="k">export async function</span> <span class="f">POST</span>(req: Request) {
+  <span class="k">const</span> { userId } = <span class="f">auth</span>()
+  <span class="k">if</span> (!userId) <span class="k">return</span> Response.<span class="f">json</span>({ error: <span class="s">'Unauthorised'</span> }, { status: 401 })
+
+  <span class="k">const</span> { priceId } = <span class="k">await</span> req.<span class="f">json</span>()
+
+  <span class="c">// Get or create Stripe customer</span>
+  <span class="k">const</span> { data: user } = <span class="k">await</span> supabaseAdmin
+    .<span class="f">from</span>(<span class="s">'users'</span>)
+    .<span class="f">select</span>(<span class="s">'*'</span>)
+    .<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, userId)
+    .<span class="f">single</span>()
+
+  <span class="k">let</span> customerId = user?.stripe_customer_id
+  <span class="k">if</span> (!customerId) {
+    <span class="k">const</span> customer = <span class="k">await</span> stripe.customers.<span class="f">create</span>({
+      metadata: { clerk_user_id: userId }
+    })
+    customerId = customer.id
+    <span class="k">await</span> supabaseAdmin.<span class="f">from</span>(<span class="s">'users'</span>)
+      .<span class="f">update</span>({ stripe_customer_id: customerId })
+      .<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, userId)
+  }
+
+  <span class="k">const</span> session = <span class="k">await</span> stripe.checkout.sessions.<span class="f">create</span>({
+    customer: customerId,
+    mode: <span class="s">'subscription'</span>,
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: <span class="s">`${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`</span>,
+    cancel_url: <span class="s">`${process.env.NEXT_PUBLIC_APP_URL}/?canceled=true`</span>,
+    subscription_data: {
+      trial_period_days: 7,
+      metadata: { clerk_user_id: userId }
+    }
+  })
+
+  <span class="k">return</span> Response.<span class="f">json</span>({ url: session.url })
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">3</div>
+    <div class="step-content">
+      <div class="step-title">Webhook route — unlocks access after payment</div>
+      <div class="step-desc">Stripe calls this route when subscription events happen. This is how your app knows someone has paid and should get access.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/api/stripe/webhook/route.ts</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">ts</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { headers } <span class="k">from</span> <span class="s">'next/headers'</span>
+<span class="k">import</span> { stripe } <span class="k">from</span> <span class="s">'@/lib/stripe'</span>
+<span class="k">import</span> { supabaseAdmin } <span class="k">from</span> <span class="s">'@/lib/supabase'</span>
+
+<span class="k">export async function</span> <span class="f">POST</span>(req: Request) {
+  <span class="k">const</span> body = <span class="k">await</span> req.<span class="f">text</span>()
+  <span class="k">const</span> sig = headers().<span class="f">get</span>(<span class="s">'stripe-signature'</span>)!
+
+  <span class="k">let</span> event
+  <span class="k">try</span> {
+    event = stripe.webhooks.<span class="f">constructEvent</span>(
+      body, sig, process.env.<span class="v">STRIPE_WEBHOOK_SECRET</span>!
+    )
+  } <span class="k">catch</span> (err) {
+    <span class="k">return</span> Response.<span class="f">json</span>({ error: <span class="s">'Webhook error'</span> }, { status: 400 })
+  }
+
+  <span class="k">const</span> subscription = event.data.object <span class="k">as any</span>
+  <span class="k">const</span> clerkUserId = subscription.metadata?.clerk_user_id
+
+  <span class="k">switch</span> (event.type) {
+    <span class="k">case</span> <span class="s">'customer.subscription.created'</span>:
+    <span class="k">case</span> <span class="s">'customer.subscription.updated'</span>:
+      <span class="k">await</span> supabaseAdmin.<span class="f">from</span>(<span class="s">'users'</span>).<span class="f">update</span>({
+        subscription_status: subscription.status, <span class="c">// trialing | active</span>
+        plan: <span class="s">'professional'</span>
+      }).<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, clerkUserId)
+      <span class="k">break</span>
+
+    <span class="k">case</span> <span class="s">'customer.subscription.deleted'</span>:
+      <span class="k">await</span> supabaseAdmin.<span class="f">from</span>(<span class="s">'users'</span>).<span class="f">update</span>({
+        subscription_status: <span class="s">'canceled'</span>,
+        plan: <span class="s">'free'</span>
+      }).<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, clerkUserId)
+      <span class="k">break</span>
+  }
+
+  <span class="k">return</span> Response.<span class="f">json</span>({ received: <span class="k">true</span> })
+}</pre>
+      </div>
+      <div class="callout warn"><strong>Important:</strong> Stripe webhooks need the raw request body — not parsed JSON. The <code>req.text()</code> call above is deliberate. If you use <code>req.json()</code> the signature verification will fail.</div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">4</div>
+    <div class="step-content">
+      <div class="step-title">Gate the dashboard behind an active subscription</div>
+      <div class="step-desc">Check subscription status in your dashboard page and redirect to pricing if they're not paying.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/dashboard/page.tsx — add subscription check</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">tsx</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> { auth } <span class="k">from</span> <span class="s">'@clerk/nextjs/server'</span>
+<span class="k">import</span> { redirect } <span class="k">from</span> <span class="s">'next/navigation'</span>
+<span class="k">import</span> { supabaseAdmin } <span class="k">from</span> <span class="s">'@/lib/supabase'</span>
+
+<span class="k">export default async function</span> <span class="f">DashboardPage</span>() {
+  <span class="k">const</span> { userId } = <span class="f">auth</span>()
+  <span class="k">if</span> (!userId) <span class="f">redirect</span>(<span class="s">'/sign-in'</span>)
+
+  <span class="k">const</span> { data: user } = <span class="k">await</span> supabaseAdmin
+    .<span class="f">from</span>(<span class="s">'users'</span>)
+    .<span class="f">select</span>(<span class="s">'subscription_status, plan'</span>)
+    .<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, userId)
+    .<span class="f">single</span>()
+
+  <span class="k">const</span> hasAccess = [<span class="s">'trialing'</span>, <span class="s">'active'</span>].<span class="f">includes</span>(user?.subscription_status)
+  <span class="k">if</span> (!hasAccess) <span class="f">redirect</span>(<span class="s">'/?pricing=true'</span>)
+
+  <span class="c">// User has active subscription — render the app</span>
+  <span class="k">return</span> <span class="p">&lt;</span><span class="v">InspectAIApp</span> userId={userId} <span class="p">/&gt;</span>
+}</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+
+<!-- ══════════ 5. AI ROUTE ══════════ -->
+<div id="api" class="page">
+<div class="wrap">
+  <div class="section-eyebrow">Step 5</div>
+  <h2>The AI <em>Route</em></h2>
+  <p class="section-sub">The Claude API call must live server-side — never in the browser. This route receives the checklist, builds the prompt, calls Claude, streams the response back, and saves the report to Supabase.</p>
+
+  <div class="callout warn"><strong>Why server-side?</strong> Your ANTHROPIC_API_KEY must never reach the browser. If you call Claude from a client component, your API key is exposed in network requests and anyone can steal it and run up your bill.</div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">1</div>
+    <div class="step-content">
+      <div class="step-title">The streaming report generation route</div>
+      <div class="step-desc">This receives the checklist data, verifies the user has an active subscription, calls Claude with streaming, and saves the final report to Supabase.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/app/api/generate-report/route.ts</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">ts</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">import</span> Anthropic <span class="k">from</span> <span class="s">'@anthropic-ai/sdk'</span>
+<span class="k">import</span> { auth } <span class="k">from</span> <span class="s">'@clerk/nextjs/server'</span>
+<span class="k">import</span> { supabaseAdmin } <span class="k">from</span> <span class="s">'@/lib/supabase'</span>
+
+<span class="k">const</span> anthropic = <span class="k">new</span> <span class="f">Anthropic</span>()
+
+<span class="k">export async function</span> <span class="f">POST</span>(req: Request) {
+  <span class="k">const</span> { userId } = <span class="f">auth</span>()
+  <span class="k">if</span> (!userId) <span class="k">return</span> Response.<span class="f">json</span>({ error: <span class="s">'Unauthorised'</span> }, { status: 401 })
+
+  <span class="c">// 1. Verify active subscription</span>
+  <span class="k">const</span> { data: user } = <span class="k">await</span> supabaseAdmin
+    .<span class="f">from</span>(<span class="s">'users'</span>).<span class="f">select</span>(<span class="s">'subscription_status, plan, reports_used_this_month'</span>)
+    .<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, userId).<span class="f">single</span>()
+
+  <span class="k">if</span> (![<span class="s">'trialing'</span>, <span class="s">'active'</span>].<span class="f">includes</span>(user?.subscription_status)) {
+    <span class="k">return</span> Response.<span class="f">json</span>({ error: <span class="s">'Subscription required'</span> }, { status: 403 })
+  }
+
+  <span class="c">// 2. Check monthly report limit for starter plan</span>
+  <span class="k">if</span> (user?.plan === <span class="s">'starter'</span> && user.reports_used_this_month >= 25) {
+    <span class="k">return</span> Response.<span class="f">json</span>({ error: <span class="s">'Monthly report limit reached'</span> }, { status: 429 })
+  }
+
+  <span class="c">// 3. Get inspector profile for context</span>
+  <span class="k">const</span> { checklistData, meta } = <span class="k">await</span> req.<span class="f">json</span>()
+  <span class="k">const</span> { data: profile } = <span class="k">await</span> supabaseAdmin
+    .<span class="f">from</span>(<span class="s">'inspector_profiles'</span>).<span class="f">select</span>(<span class="s">'*'</span>)
+    .<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, userId).<span class="f">single</span>()
+
+  <span class="c">// 4. Build system prompt from profile</span>
+  <span class="k">const</span> systemPrompt = <span class="s">`You are an expert home inspection report writer.
+Inspector: ${profile.name}, ${profile.company}
+License: ${profile.license_number} (${profile.state})
+Style: ${profile.report_style}
+Generate professional, clear reports. Be objective and actionable.`</span>
+
+  <span class="c">// 5. Stream the response</span>
+  <span class="k">const</span> encoder = <span class="k">new</span> <span class="f">TextEncoder</span>()
+  <span class="k">let</span> fullReport = <span class="s">''</span>
+
+  <span class="k">const</span> stream = <span class="k">new</span> <span class="f">ReadableStream</span>({
+    <span class="k">async</span> <span class="f">start</span>(controller) {
+      <span class="k">const</span> response = <span class="k">await</span> anthropic.messages.<span class="f">stream</span>({
+        model: <span class="s">'claude-sonnet-4-5'</span>,
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{ role: <span class="s">'user'</span>, content: <span class="f">buildUserPrompt</span>(meta, checklistData, profile) }]
+      })
+
+      <span class="k">for await</span> (<span class="k">const</span> chunk <span class="k">of</span> response) {
+        <span class="k">if</span> (chunk.type === <span class="s">'content_block_delta'</span> && chunk.delta.type === <span class="s">'text_delta'</span>) {
+          fullReport += chunk.delta.text
+          controller.<span class="f">enqueue</span>(encoder.<span class="f">encode</span>(chunk.delta.text))
+        }
+      }
+
+      <span class="c">// 6. Save completed report to Supabase</span>
+      <span class="k">await</span> supabaseAdmin.<span class="f">from</span>(<span class="s">'reports'</span>).<span class="f">insert</span>({
+        clerk_user_id: userId,
+        address: meta.address,
+        client_name: meta.clientName,
+        inspection_date: meta.date,
+        checklist_data: checklistData,
+        generated_report: fullReport
+      })
+
+      <span class="c">// 7. Increment report counter</span>
+      <span class="k">await</span> supabaseAdmin.<span class="f">from</span>(<span class="s">'users'</span>).<span class="f">update</span>({
+        reports_used_this_month: (user.reports_used_this_month || 0) + 1
+      }).<span class="f">eq</span>(<span class="s">'clerk_user_id'</span>, userId)
+
+      controller.<span class="f">close</span>()
+    }
+  })
+
+  <span class="k">return new</span> <span class="f">Response</span>(stream, {
+    headers: { <span class="s">'Content-Type'</span>: <span class="s">'text/plain; charset=utf-8'</span> }
+  })
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">2</div>
+    <div class="step-content">
+      <div class="step-title">Call the route from your React component</div>
+      <div class="step-desc">Replace the direct Claude API call in your existing component with a fetch to your own API route. Same streaming behaviour, but now it's secure.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">src/components/ReportGenerator.tsx — replace the old callClaude()</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">tsx</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="k">async function</span> <span class="f">generateReport</span>(meta: any, checklistData: any) {
+  <span class="k">const</span> res = <span class="k">await</span> <span class="f">fetch</span>(<span class="s">'/api/generate-report'</span>, {
+    method: <span class="s">'POST'</span>,
+    headers: { <span class="s">'Content-Type'</span>: <span class="s">'application/json'</span> },
+    body: <span class="v">JSON</span>.<span class="f">stringify</span>({ meta, checklistData })
+  })
+
+  <span class="k">if</span> (!res.ok) <span class="k">throw new</span> <span class="f">Error</span>(<span class="k">await</span> res.<span class="f">text</span>())
+
+  <span class="c">// Stream the response into state</span>
+  <span class="k">const</span> reader = res.body!.<span class="f">getReader</span>()
+  <span class="k">const</span> decoder = <span class="k">new</span> <span class="f">TextDecoder</span>()
+  <span class="k">let</span> result = <span class="s">''</span>
+
+  <span class="k">while</span> (<span class="k">true</span>) {
+    <span class="k">const</span> { done, value } = <span class="k">await</span> reader.<span class="f">read</span>()
+    <span class="k">if</span> (done) <span class="k">break</span>
+    result += decoder.<span class="f">decode</span>(value, { stream: <span class="k">true</span> })
+    <span class="f">setOutput</span>(result) <span class="c">// update state as it streams</span>
+  }
+}</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+
+<!-- ══════════ 6. DEPLOY ══════════ -->
+<div id="deploy" class="page">
+<div class="wrap">
+  <div class="section-eyebrow">Step 6</div>
+  <h2>Deploy to <em>Vercel</em></h2>
+  <p class="section-sub">Push to GitHub, connect to Vercel, add your environment variables, and your app is live in about 10 minutes. Then wire up the Stripe webhook and you're open for business.</p>
+
+  <div class="step-block">
+    <div class="step-num-wrap">1</div>
+    <div class="step-content">
+      <div class="step-title">Push your code to GitHub</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">terminal</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre>git init
+git add .
+git commit -m <span class="s">"initial commit"</span>
+
+<span class="c"># Create a new repo on github.com, then:</span>
+git remote add origin https://github.com/yourusername/inspectai.git
+git push -u origin main</pre>
+      </div>
+      <div class="callout warn"><strong>Before you push:</strong> confirm .env.local is in your .gitignore. It should be by default with create-next-app but double-check. Your API keys must never reach GitHub.</div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">2</div>
+    <div class="step-content">
+      <div class="step-title">Connect to Vercel and add environment variables</div>
+      <div class="step-desc">Go to vercel.com → New Project → Import from GitHub → select your repo. Before you deploy, add all your env variables in the Vercel dashboard.</div>
+      <table class="env-table">
+        <tr><th>Variable</th><th>Where to get it</th></tr>
+        <tr><td>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</td><td>Clerk Dashboard → API Keys</td></tr>
+        <tr><td>CLERK_SECRET_KEY</td><td>Clerk Dashboard → API Keys</td></tr>
+        <tr><td>NEXT_PUBLIC_SUPABASE_URL</td><td>Supabase Dashboard → Project Settings → API</td></tr>
+        <tr><td>NEXT_PUBLIC_SUPABASE_ANON_KEY</td><td>Supabase Dashboard → Project Settings → API</td></tr>
+        <tr><td>SUPABASE_SERVICE_ROLE_KEY</td><td>Supabase Dashboard → Project Settings → API</td></tr>
+        <tr><td>STRIPE_SECRET_KEY</td><td>Stripe Dashboard → Developers → API Keys</td></tr>
+        <tr><td>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</td><td>Stripe Dashboard → Developers → API Keys</td></tr>
+        <tr><td>STRIPE_WEBHOOK_SECRET</td><td>Created in Step 3 below</td></tr>
+        <tr><td>ANTHROPIC_API_KEY</td><td>console.anthropic.com → API Keys</td></tr>
+        <tr><td>NEXT_PUBLIC_APP_URL</td><td>https://inspectai.com (your Vercel domain)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">3</div>
+    <div class="step-content">
+      <div class="step-title">Register the Stripe webhook</div>
+      <div class="step-desc">After your first deploy, go to Stripe → Developers → Webhooks → Add endpoint. Point it at your live URL.</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">Stripe webhook endpoint URL</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">url</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre>https://inspectai.com/api/stripe/webhook</pre>
+      </div>
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="info-card-title">Events to subscribe to</div>
+          <ul class="info-list">
+            <li>customer.subscription.created</li>
+            <li>customer.subscription.updated</li>
+            <li>customer.subscription.deleted</li>
+            <li>invoice.payment_failed</li>
+          </ul>
+        </div>
+        <div class="info-card">
+          <div class="info-card-title">After creating webhook</div>
+          <ul class="info-list">
+            <li>Copy the Signing Secret (whsec_...)</li>
+            <li>Add it as STRIPE_WEBHOOK_SECRET in Vercel</li>
+            <li>Trigger a redeploy for the new env var to take effect</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">4</div>
+    <div class="step-content">
+      <div class="step-title">Connect your custom domain</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">terminal</span>
+          <div style="display:flex;gap:8px;align-items:center"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        </div>
+        <pre><span class="c"># Install Vercel CLI if you haven't</span>
+npm i -g vercel
+
+<span class="c"># Add your domain (then update DNS at your registrar)</span>
+vercel domains add inspectai.com</pre>
+      </div>
+      <div class="callout tip">Vercel will give you DNS records to add at Namecheap. Usually an A record and a CNAME. Takes 10–30 minutes to propagate. HTTPS is automatic.</div>
+    </div>
+  </div>
+
+  <div class="step-block">
+    <div class="step-num-wrap">5</div>
+    <div class="step-content">
+      <div class="step-title">Pre-launch checklist — run through this before sharing with anyone</div>
+      <ul class="deploy-checklist">
+        <li><strong>Auth:</strong> Sign up with a new email — confirm you land on /onboarding</li>
+        <li><strong>Onboarding:</strong> Complete all steps — confirm profile saves to Supabase</li>
+        <li><strong>Stripe trial:</strong> Use test card 4242 4242 4242 4242 — confirm subscription_status becomes 'trialing' in Supabase</li>
+        <li><strong>Report generation:</strong> Fill checklist, hit generate — confirm output streams correctly</li>
+        <li><strong>Report saved:</strong> Check Supabase reports table — confirm the row was created</li>
+        <li><strong>Paywall:</strong> Manually set subscription_status to 'canceled' — confirm redirect to pricing</li>
+        <li><strong>Stripe webhook:</strong> Use Stripe CLI to replay events — confirm Supabase updates</li>
+        <li><strong>Mobile:</strong> Test the full flow on your phone — confirm nothing breaks</li>
+        <li><strong>Cancel flow:</strong> Cancel a subscription in Stripe — confirm access is revoked</li>
+        <li><strong>NEXT_PUBLIC_APP_URL:</strong> Set to your live domain, not localhost</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="background: var(--ink); color: var(--paper); border-radius: 12px; padding: 28px 32px; margin-top: 32px;">
+    <div style="font-family: 'Fraunces', serif; font-weight: 700; font-size: 17px; color: var(--orange); margin-bottom: 14px;">You're live. What now?</div>
+    <div style="font-size: 13px; color: rgba(246,242,235,0.45); line-height: 1.9;">
+      Once this checklist passes, you have a <strong style="color:var(--paper)">production-grade, self-serve SaaS</strong> — auth, payments, database, AI, custom domain. Users can sign up, pay, and generate reports without you touching anything.<br><br>
+      Every subsequent deployment is just <code style="color:var(--orange)">git push origin main</code>. Vercel picks it up automatically.<br><br>
+      Your next build priorities: <strong style="color:var(--paper)">branded PDF export</strong> (jsPDF or Puppeteer), <strong style="color:var(--paper)">report history page</strong> (query Supabase reports table by user), and <strong style="color:var(--paper)">client email delivery</strong> (Resend.com — free tier, 3,000 emails/month).
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  const text = pre.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
